@@ -1,4 +1,4 @@
-= Exemplo mínimo exemplo reproduzível do cenário dos logs com Spring Boot e Compilação Nativa
+= Exemplo mínimo reproduzível do cenário dos logs com Spring Boot e Compilação Nativa
 
 Todos os testes foram realizados em uma máquina Linux:
 
