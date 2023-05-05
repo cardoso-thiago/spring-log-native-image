@@ -1,0 +1,98 @@
+= Mínimo exemplo reproduzível do cenário dos logs com Spring Boot e Compilação Nativa
+
+Todos os testes foram realizados em uma máquina Linux:
+
+                   -`                    cardoso@cardoso-arch 
+                  .o+`                   -------------------- 
+                 `ooo/                   OS: Arch Linux x86_64 
+                `+oooo:                  Host: Aspire A515-52G V1.09 
+               `+oooooo:                 Kernel: 6.2.13-arch1-1 
+               -+oooooo+:                Uptime: 22 mins 
+             `/:-:++oooo+:               Packages: 1473 (pacman) 
+            `/++++/+++++++:              Shell: zsh 5.9 
+           `/++++++++++++++:             Resolution: 1920x1080 
+          `/+++ooooooooooooo/`           DE: Plasma 5.27.4 
+         ./ooosssso++osssssso+`          WM: KWin 
+        .oossssso-````/ossssss+`         WM Theme: Layan-solid 
+       -osssssso.      :ssssssso.        Theme: Layan [Plasma], Layan-dark-solid [GTK2/3] 
+      :osssssss/        osssso+++.       Icons: Tela-dark [Plasma], Tela-dark [GTK2/3] 
+     /ossssssss/        +ssssooo/-       Terminal: HyperTerm 
+   `/ossssso+/:-        -:/+osssso+-     Terminal Font: MesloLGL Nerd Font 
+  `+sso+:-`                 `.-/+oso:    CPU: Intel i5-8265U (8) @ 3.900GHz 
+ `++:.                           `-/+/   GPU: NVIDIA GeForce MX130 
+ .`                                 `/   GPU: Intel WhiskeyLake-U GT2 [UHD Graphics 620] 
+                                         Memory: 7267MiB / 15847MiB (45%) 
+                                         Song: The Atomic Bitchwax - TAB 4 - Wreck You 
+                                         Music Player: spotify 
+
+
+== Log4j 2
+
+Atualmente o suporte não existe, ou no mínimo o uso não é transparente. Para reproduzir o erro:
+
+- Acessar o projeto `spring-log4j`
+- Executar o comando `mvn -Pnative spring-boot:build-image`
+- Em seguida o comando `docker run docker.io/library/spring-log4j:0.0.1-SNAPSHOT`
+
+O resultado será o seguinte stacktrace de erro:
+
+[source, shell]
+----
+Exception in thread "main" java.lang.ExceptionInInitializerError
+        at org.apache.logging.log4j.LogManager.<clinit>(LogManager.java:61)
+        at org.apache.commons.logging.LogAdapter$Log4jLog.<clinit>(LogAdapter.java:146)
+        at org.apache.commons.logging.LogAdapter$Log4jAdapter.createLog(LogAdapter.java:113)
+        at org.apache.commons.logging.LogAdapter.createLog(LogAdapter.java:95)
+        at org.apache.commons.logging.LogFactory.getLog(LogFactory.java:67)
+        at org.apache.commons.logging.LogFactory.getLog(LogFactory.java:59)
+        at org.springframework.boot.SpringApplication.<clinit>(SpringApplication.java:183)
+        at br.com.cardoso.SpringLog4jApplication.main(SpringLog4jApplication.java:10)
+Caused by: java.lang.IllegalStateException: java.lang.InstantiationException: org.apache.logging.log4j.message.DefaultFlowMessageFactory
+        at org.apache.logging.log4j.spi.AbstractLogger.createDefaultFlowMessageFactory(AbstractLogger.java:246)
+        at org.apache.logging.log4j.spi.AbstractLogger.<init>(AbstractLogger.java:144)
+        at org.apache.logging.log4j.status.StatusLogger.<init>(StatusLogger.java:133)
+        at org.apache.logging.log4j.status.StatusLogger.<clinit>(StatusLogger.java:85)
+        ... 8 more
+Caused by: java.lang.InstantiationException: org.apache.logging.log4j.message.DefaultFlowMessageFactory
+        at java.base@17.0.7/java.lang.Class.newInstance(DynamicHub.java:639)
+        at org.apache.logging.log4j.spi.AbstractLogger.createDefaultFlowMessageFactory(AbstractLogger.java:244)
+        ... 11 more
+Caused by: java.lang.NoSuchMethodException: org.apache.logging.log4j.message.DefaultFlowMessageFactory.<init>()
+        at java.base@17.0.7/java.lang.Class.getConstructor0(DynamicHub.java:3585)
+        at java.base@17.0.7/java.lang.Class.newInstance(DynamicHub.java:626)
+        ... 12 more
+----
+
+== Logback
+
+Nesse caso, o suporte é nativo, e podemos visualizar a execução da aplicação com sucesso. Para validar esse cenário:
+
+- Acessar o projeto `spring-logback`
+- Executar o comando `mvn -Pnative spring-boot:build-image`
+- Em seguida o comando `docker run -p 8080:8080 docker.io/library/spring-logback:0.0.1-SNAPSHOT`
+- Por fim, em outro terminal, o comando `curl localhost:8080/hello`
+
+O resultado será a mensagem `Hello World`.
+
+== SLF4J Manual
+
+Nesse teste, foi adicionada a dependência `jul-to-slf4j` diretamente no projeto. Foram adicionadas também as dependências `logback-classic` e `spring-boot-starter-log4j2`. As duas não convivem, portanto o teste nesse caso deve ser executado em partes, comentando a dependência de acordo com o teste. Os arquivos de configuração tanto do Log4J 2 quanto do Logback foram adicionados ao projeto, em uma execução normal, é possível ver a diferença nos logs de acordo com a dependência comentada.
+
+=== SLF4J + Log4J 2
+
+- Acessar o projeto `spring-slf4j`
+- Deixando a dependência `logback-classic` comentada e a dependência `spring-boot-starter-log4j2` descomentada, seguimos com os testes:
+- Executar o comando `mvn -Pnative spring-boot:build-image`
+- Em seguida o comando `docker run docker.io/library/spring-slf4j:0.0.1-SNAPSHOT`
+
+O resultado será o mesmo stacktrace do teste com o Log4J 2, mesmo utilizando o `LoggerFactory` do SLF4J.
+
+=== SLF4J + Logback
+
+- Acessar o projeto `spring-slf4j`
+- Deixando a dependência `logback-classic` descomentada e a dependência `spring-boot-starter-log4j2` comentada, seguimos com os testes:
+- Executar o comando `mvn -Pnative spring-boot:build-image`
+- Em seguida o comando `docker run -p 8080:8080 docker.io/library/spring-slf4j:0.0.1-SNAPSHOT`
+- Por fim, em outro terminal, o comando `curl localhost:8080/hello`
+
+O resultado será o mesmo do teste com o Logback, ou seja, a mensagem `Hello World`.
