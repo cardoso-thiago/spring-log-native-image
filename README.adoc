@@ -1,4 +1,4 @@
-= Mínimo exemplo reproduzível do cenário dos logs com Spring Boot e Compilação Nativa
+= Exemplo mínimo exemplo reproduzível do cenário dos logs com Spring Boot e Compilação Nativa
 
 Todos os testes foram realizados em uma máquina Linux:
 
@@ -96,3 +96,25 @@ O resultado será o mesmo stacktrace do teste com o Log4J 2, mesmo utilizando o 
 - Por fim, em outro terminal, o comando `curl localhost:8080/hello`
 
 O resultado será o mesmo do teste com o Logback, ou seja, a mensagem `Hello World`.
+
+== Solução Paliativa para convivência dos providers de logs
+
+No projeto `spring-slf4j` foi adicionada a classe `LoggerFactory` no pacote `org.slf4j`, que tem como intenção substituir a implementação original da dependência do SLF4J. A classe em si é uma cópia da implementação, mas com um método adicional que desconsidera o provider do `SimpleLogger`:
+
+[source,java]
+----
+    private static List<SLF4JServiceProvider> clearProvidersList(List<SLF4JServiceProvider> providerList) {
+        List<SLF4JServiceProvider> clearProviderList = new ArrayList<>();
+        if(providerList.size() > 1) {
+            for (SLF4JServiceProvider provider: providerList) {
+                if(!provider.getClass().getName().equals("org.slf4j.simple.SimpleServiceProvider")) {
+                    clearProviderList.add(provider);
+                }
+            }
+            return clearProviderList;
+        }
+        return providerList;
+    }
+----
+
+Dessa forma, se houver apenas a dependência do `slf4j-simple` no classpath, ele será utilizado como mecanismo de log. Caso contrário, segue no fluxo padrão, que vai considerar o próximo provider, e alertar para a existência de mais providers no classpath, selecionando o primeiro da lista (o que pra todos os efeitos, ocorre de modo aleatório).
